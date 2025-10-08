@@ -1,0 +1,79 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql" // or "postgresql", "sqlite", etc.
+  url      = env("DATABASE_URL")
+}
+
+// Driver model
+model Driver {
+  id            String      @id @default(cuid())
+  fullName      String
+  phone         String
+  email         String?
+  vehicleNumber String
+  licenseNumber String
+  idFront       String?
+  idBack        String?
+  licenseDoc    String?
+  rcDoc         String?
+  selfie        String?
+  journeyType   JourneyType
+  fromCity      String?
+  toCity        String?
+  status        String      @default("PENDING")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("drivers")
+}
+
+enum JourneyType {
+  INTERCITY
+  LOCAL
+  BOTH
+  UNKNOWN
+}
+
+
+model Rider {
+  id              String   @id @default(uuid())
+  fullName        String
+  phone           String   @unique
+  email           String?  @db.VarChar(191)
+  profilePhotoUrl String?
+  marketingOptIn  Boolean  @default(false)
+  acceptTerms     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  addresses   RiderAddress[]
+  preferences RiderPreference?
+}
+
+model RiderAddress {
+  id         String      @id @default(uuid())
+  riderId    String
+  type       AddressType
+  fullText   String
+  createdAt  DateTime    @default(now())
+
+  rider      Rider       @relation(fields: [riderId], references: [id], onDelete: Cascade)
+}
+
+model RiderPreference {
+  id                 String   @id @default(uuid())
+  riderId            String   @unique
+  language           String?
+  accessibilityNeeds String?
+
+  rider              Rider    @relation(fields: [riderId], references: [id], onDelete: Cascade)
+}
+
+enum AddressType {
+  HOME
+  WORK
+}
