@@ -1,32 +1,38 @@
-// prisma/schema.prisma
+// schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql" // or "postgresql", "sqlite", etc.
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-// Driver model
 model Driver {
   id            String      @id @default(cuid())
   fullName      String
-  phone         String
-  email         String?
+  phone         String      @unique
+  email         String?     @unique
   vehicleNumber String
-  licenseNumber String
+  licenseNumber String      @unique
   idFront       String?
   idBack        String?
   licenseDoc    String?
   rcDoc         String?
   selfie        String?
-  journeyType   JourneyType
+  journeyType   JourneyType @default(UNKNOWN)
   fromCity      String?
   toCity        String?
-  status        String      @default("PENDING")
+  status        DriverStatus @default(PENDING)
+  isOnline      Boolean     @default(false)
+  rating        Float?      @default(4.5)
+  totalRides    Int         @default(0)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  // Relations
+  notifications DriverNotification[]
+  assignedRides RideBooking[]
 
   @@map("drivers")
 }
@@ -38,42 +44,166 @@ enum JourneyType {
   UNKNOWN
 }
 
+enum DriverStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  BLOCKED
+}
 
 model Rider {
   id              String   @id @default(uuid())
   fullName        String
   phone           String   @unique
-  email           String?  @db.VarChar(191)
+  email           String?  @unique
   profilePhotoUrl String?
   marketingOptIn  Boolean  @default(false)
   acceptTerms     Boolean  @default(false)
+  rating          Float?   @default(5.0)
+  totalRides      Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   addresses   RiderAddress[]
   preferences RiderPreference?
+  bookings    RideBooking[]
+
+  @@map("riders")
 }
 
 model RiderAddress {
-  id         String      @id @default(uuid())
-  riderId    String
-  type       AddressType
-  fullText   String
-  createdAt  DateTime    @default(now())
+  id        String      @id @default(uuid())
+  riderId   String
+  type      AddressType
+  fullText  String
+  landmark  String?
+  lat       String?
+  lon       String?
+  createdAt DateTime    @default(now())
 
-  rider      Rider       @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
+
+  @@map("rider_addresses")
 }
 
 model RiderPreference {
-  id                 String   @id @default(uuid())
-  riderId            String   @unique
-  language           String?
+  id                 String  @id @default(uuid())
+  riderId            String  @unique
+  language           String? @default("en")
   accessibilityNeeds String?
+  preferredVehicle   String?
 
-  rider              Rider    @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
+
+  @@map("rider_preferences")
 }
 
 enum AddressType {
   HOME
   WORK
+  OTHER
+}
+
+model Location {
+  id           String   @id @default(cuid())
+  place_id     String   @unique
+  display_name String
+  lat          String
+  lon          String
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@map("locations")
+}
+
+model RideBooking {
+  id           String   @id @default(cuid())
+  vehicleType  String
+  fromLocation String
+  toLocation   String
+  fromLat      String?
+  fromLon      String?
+  toLat        String?
+  toLon        String?
+  price        Float
+  distance     Float
+  status       RideStatus @default(PENDING)
+  
+  // Customer info
+  customerName  String?
+  customerPhone String?
+  customerRating Float? @default(4.5)
+  
+  // Driver assignment
+  driverId     String?
+  driverName   String?
+  
+  // Rider relation
+  userId       String?
+  
+  // Timestamps
+  created_at   DateTime @default(now())
+  acceptedAt   DateTime?
+  declinedAt   DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  updated_at   DateTime @updatedAt
+
+  // Relations
+  notifications DriverNotification[]
+  rider         Rider?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driver        Driver?   @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  @@map("ride_bookings")
+}
+
+enum RideStatus {
+  PENDING
+  CONFIRMED
+  ACCEPTED
+  ARRIVED
+  STARTED
+  COMPLETED
+  CANCELLED
+  DECLINED
+}
+
+model VehicleType {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  icon       String
+  basePrice  Float
+  pricePerKm Float
+  seats      Int
+  color      String
+  isActive   Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("vehicle_types")
+}
+
+model DriverNotification {
+  id             String   @id @default(cuid())
+  driverId       String
+  rideBookingId  String
+  type           NotificationType @default(RIDE_REQUEST)
+  status         String   // accepted, declined, etc.
+  message        String   @db.VarChar(500)
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  // Relations
+  driver      Driver      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  rideBooking RideBooking @relation(fields: [rideBookingId], references: [id], onDelete: Cascade)
+
+  @@map("driver_notifications")
+}
+
+enum NotificationType {
+  RIDE_REQUEST
+  RIDE_UPDATE
+  SYSTEM
+  PAYMENT
 }

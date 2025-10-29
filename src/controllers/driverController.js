@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+// In your driver registration controller
 export const registerDriver = async (req, res) => {
   try {
     console.log("Received driver registration data:", req.body);
@@ -54,10 +55,10 @@ export const registerDriver = async (req, res) => {
         licenseDoc,
         rcDoc,
         selfie,
-        journeyType: journeyTypeValue, // Use the converted value
+        journeyType: journeyTypeValue,
         fromCity,
         toCity,
-        status: "PENDING"
+        status: "ACTIVE" // ✅ Change to ACTIVE so they can receive rides immediately
       }
     });
 
@@ -66,8 +67,8 @@ export const registerDriver = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Driver registered successfully",
-      driverId: driver.id,
-      data: driver
+      driverId: driver.id, // ✅ Return the actual driver ID
+      driverData: driver   // ✅ Return full driver data
     });
 
   } catch (error) {
