@@ -1,34 +1,35 @@
 // schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider          = "mysql"
+  url               = env("DATABASE_URL")
 }
 
 model Driver {
-  id            String      @id @default(cuid())
+  id            String       @id @default(cuid())
   fullName      String
-  phone         String      @unique
-  email         String?     @unique
+  phone         String       @unique
+  email         String?      @unique
   vehicleNumber String
-  licenseNumber String      @unique
+  licenseNumber String       @unique
   idFront       String?
   idBack        String?
   licenseDoc    String?
   rcDoc         String?
   selfie        String?
-  journeyType   JourneyType @default(UNKNOWN)
+  journeyType   JourneyType  @default(UNKNOWN)
   fromCity      String?
   toCity        String?
   status        DriverStatus @default(PENDING)
-  isOnline      Boolean     @default(false)
-  rating        Float?      @default(4.5)
-  totalRides    Int         @default(0)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  isOnline      Boolean      @default(false)
+  rating        Float?       @default(4.5)
+  totalRides    Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   // Relations
   notifications DriverNotification[]
@@ -46,9 +47,7 @@ enum JourneyType {
 
 enum DriverStatus {
   PENDING
-  APPROVED
-  REJECTED
-  BLOCKED
+  ACTIVE
 }
 
 model Rider {
@@ -117,7 +116,7 @@ model Location {
 }
 
 model RideBooking {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   vehicleType  String
   fromLocation String
   toLocation   String
@@ -128,45 +127,41 @@ model RideBooking {
   price        Float
   distance     Float
   status       RideStatus @default(PENDING)
-  
+
   // Customer info
-  customerName  String?
-  customerPhone String?
-  customerRating Float? @default(4.5)
-  
+  customerName   String?
+  customerPhone  String?
+  customerRating Float?  @default(4.5)
+
   // Driver assignment
-  driverId     String?
-  driverName   String?
-  
+  driverId   String?
+  driverName String?
+
   // Rider relation
-  userId       String?
-  
+  userId String?
+
   // Timestamps
-  created_at   DateTime @default(now())
-  acceptedAt   DateTime?
-  declinedAt   DateTime?
-  startedAt    DateTime?
-  completedAt  DateTime?
-  cancelledAt  DateTime?
-  updated_at   DateTime @updatedAt
+  created_at  DateTime  @default(now())
+  acceptedAt  DateTime?
+  declinedAt  DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+  updated_at  DateTime  @updatedAt
 
   // Relations
   notifications DriverNotification[]
-  rider         Rider?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  driver        Driver?   @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  rider         Rider?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driver        Driver?              @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
   @@map("ride_bookings")
 }
 
 enum RideStatus {
   PENDING
-  CONFIRMED
   ACCEPTED
-  ARRIVED
-  STARTED
-  COMPLETED
-  CANCELLED
   DECLINED
+  CANCELLED
 }
 
 model VehicleType {
@@ -185,14 +180,14 @@ model VehicleType {
 }
 
 model DriverNotification {
-  id             String   @id @default(cuid())
-  driverId       String
-  rideBookingId  String
-  type           NotificationType @default(RIDE_REQUEST)
-  status         String   // accepted, declined, etc.
-  message        String   @db.VarChar(500)
-  isRead         Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  id            String           @id @default(cuid())
+  driverId      String
+  rideBookingId String
+  type          NotificationType @default(RIDE_REQUEST)
+  status        String // accepted, declined, etc.
+  message       String           @db.VarChar(500)
+  isRead        Boolean          @default(false)
+  createdAt     DateTime         @default(now())
 
   // Relations
   driver      Driver      @relation(fields: [driverId], references: [id], onDelete: Cascade)
