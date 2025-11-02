@@ -198,7 +198,7 @@ const calculateFare = async (req, res) => {
     }
 };
 
-// Create ride booking - IMPROVED
+// Create ride booking - FIXED STATUS ISSUE
 const createBooking = async (req, res) => {
     try {
         const {
@@ -229,6 +229,7 @@ const createBooking = async (req, res) => {
             });
         }
 
+        // ✅ FIX: Use correct RideStatus enum value - PENDING instead of confirmed
         const booking = await prisma.rideBooking.create({
             data: {
                 vehicleType,
@@ -241,11 +242,11 @@ const createBooking = async (req, res) => {
                 toLat: toLat || null,
                 toLon: toLon || null,
                 userId: userId || null,
-                status: 'confirmed'
+                status: 'PENDING'  // ✅ FIXED: Use PENDING instead of confirmed
             }
         });
 
-        console.log(`✅ Booking created with ID: ${booking.id}`);
+        console.log(`✅ Booking created with ID: ${booking.id}, Status: ${booking.status}`);
 
         res.status(201).json({
             success: true,
@@ -258,12 +259,22 @@ const createBooking = async (req, res) => {
                 price: booking.price,
                 distance: booking.distance,
                 status: booking.status,
-                createdAt: booking.createdAt
+                createdAt: booking.created_at
             }
         });
 
     } catch (error) {
         console.error('❌ Create booking error:', error);
+        
+        // Specific error handling for status enum
+        if (error.message.includes('RideStatus') || error.message.includes('status')) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid booking status. Please use valid status from: PENDING, ACCEPTED, DECLINED, CANCELLED',
+                error: error.message
+            });
+        }
+
         res.status(500).json({
             success: false,
             message: 'Failed to create booking',
@@ -300,6 +311,85 @@ const getBooking = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to get booking',
+            error: error.message
+        });
+    }
+};
+
+// Update booking status - NEW FUNCTION
+const updateBookingStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        console.log(`🔄 Updating booking ${id} status to: ${status}`);
+
+        // Validate status
+        const validStatuses = ['PENDING', 'ACCEPTED', 'DECLINED', 'CANCELLED'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+            });
+        }
+
+        const booking = await prisma.rideBooking.update({
+            where: { id },
+            data: { 
+                status,
+                // Set timestamp based on status
+                ...(status === 'ACCEPTED' && { acceptedAt: new Date() }),
+                ...(status === 'DECLINED' && { declinedAt: new Date() }),
+                ...(status === 'CANCELLED' && { cancelledAt: new Date() })
+            }
+        });
+
+        console.log(`✅ Booking ${id} status updated to: ${booking.status}`);
+
+        res.json({
+            success: true,
+            message: 'Booking status updated successfully',
+            data: booking
+        });
+
+    } catch (error) {
+        console.error('❌ Update booking status error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update booking status',
+            error: error.message
+        });
+    }
+};
+
+// Cancel booking - NEW FUNCTION
+const cancelBooking = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        console.log(`❌ Cancelling booking: ${id}`);
+
+        const booking = await prisma.rideBooking.update({
+            where: { id },
+            data: { 
+                status: 'CANCELLED',
+                cancelledAt: new Date()
+            }
+        });
+
+        console.log(`✅ Booking ${id} cancelled successfully`);
+
+        res.json({
+            success: true,
+            message: 'Booking cancelled successfully',
+            data: booking
+        });
+
+    } catch (error) {
+        console.error('❌ Cancel booking error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to cancel booking',
             error: error.message
         });
     }
@@ -420,6 +510,8 @@ export {
     calculateFare,
     createBooking,
     getBooking,
+    updateBookingStatus,
+    cancelBooking,
     initializeVehicleTypes,
     checkLocationIQHealth
 };

@@ -1,28 +1,29 @@
-// routes/destinationSearchRoutes.js
 import express from 'express';
 import {
-  searchLocations,
-  calculateFare,
-  createBooking,
-  getBooking,
-  initializeVehicleTypes
-} from '../controllers/destinationController.js'; // Make sure this path is correct
+    searchLocations,
+    calculateFare,
+    createBooking,
+    getBooking,
+    updateBookingStatus,
+    cancelBooking,
+    initializeVehicleTypes,
+    checkLocationIQHealth
+} from '../controllers/destinationController.js';
 
 const router = express.Router();
 
-// Search locations
+// Location search routes
 router.get('/search', searchLocations);
-
-// Calculate fare
 router.post('/calculate-fare', calculateFare);
 
-// Create booking
+// Booking routes
 router.post('/book-ride', createBooking);
+router.get('/bookings/:id', getBooking);
+router.put('/bookings/:id/status', updateBookingStatus);
+router.post('/bookings/:id/cancel', cancelBooking);
 
-// Get booking by ID
-router.get('/booking/:id', getBooking);
-
-// Initialize vehicle types (admin route)
+// Admin/utility routes
 router.post('/initialize-vehicles', initializeVehicleTypes);
+router.get('/health', checkLocationIQHealth);
 
 export default router;
