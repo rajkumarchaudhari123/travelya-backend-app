@@ -1,10 +1,9 @@
 // socketServer.js
+
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-
-// Store active connections
 const activeConnections = new Map();
 
 export function setupSocketServer(server) {
@@ -16,7 +15,7 @@ export function setupSocketServer(server) {
         "http://localhost:8081",
         "http://10.0.2.2:8081",
         "http://localhost:10000",
-        "exp://your-app-url" // Expo app URL
+        "exp://your-app-url"
       ],
       methods: ["GET", "POST"]
     }
@@ -35,7 +34,6 @@ export function setupSocketServer(server) {
     return (R * c).toFixed(2);
   }
 
-  // Socket.io Connections
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
@@ -50,13 +48,21 @@ export function setupSocketServer(server) {
         // Update user online status in database
         if (userType === 'driver') {
           await prisma.driver.update({
-            where: { id: parseInt(userId) },
-            data: { isOnline: true }
+            where: { id: userId },
+            data: { 
+              isOnline: true,
+              currentLat: data.latitude || null,
+              currentLng: data.longitude || null
+            }
           });
         } else {
           await prisma.rider.update({
-            where: { id: parseInt(userId) },
-            data: { isOnline: true }
+            where: { id: userId },
+            data: { 
+              isOnline: true,
+              currentLat: data.latitude || null,
+              currentLng: data.longitude || null
+            }
           });
         }
         
@@ -77,6 +83,7 @@ export function setupSocketServer(server) {
       try {
         const { 
           riderId, 
+          vehicleType,
           fromLocation, 
           toLocation, 
           price, 
@@ -88,18 +95,28 @@ export function setupSocketServer(server) {
         } = data;
 
         // Create booking in database
-        const booking = await prisma.booking.create({
+        const booking = await prisma.rideBooking.create({
           data: {
-            riderId: parseInt(riderId),
+            vehicleType,
             fromLocation,
             toLocation,
             price: parseFloat(price),
             distance: parseFloat(distance),
-            pickupLat: parseFloat(pickupLat),
-            pickupLng: parseFloat(pickupLng),
-            dropLat: parseFloat(dropLat),
-            dropLng: parseFloat(dropLng),
-            status: 'pending'
+            fromLat: parseFloat(pickupLat),
+            fromLon: parseFloat(pickupLng),
+            toLat: parseFloat(dropLat),
+            toLon: parseFloat(dropLng),
+            userId: riderId,
+            status: 'PENDING'
+          },
+          include: {
+            rider: {
+              select: {
+                fullName: true,
+                phone: true,
+                rating: true
+              }
+            }
           }
         });
 
@@ -107,19 +124,15 @@ export function setupSocketServer(server) {
         const nearbyDrivers = await prisma.driver.findMany({
           where: {
             isOnline: true,
-            isAvailable: true
+            isAvailable: true,
+            status: 'ACTIVE'
           },
-          take: 10
-        });
-
-        // Get rider details
-        const rider = await prisma.rider.findUnique({
-          where: { id: parseInt(riderId) }
+          take: 20
         });
 
         // Notify nearby drivers
         nearbyDrivers.forEach(driver => {
-          const driverSocketId = activeConnections.get(driver.id.toString());
+          const driverSocketId = activeConnections.get(driver.id);
           if (driverSocketId) {
             io.to(driverSocketId).emit('new_ride_request', {
               bookingId: booking.id,
@@ -131,8 +144,10 @@ export function setupSocketServer(server) {
               pickupLng,
               dropLat,
               dropLng,
-              riderName: rider?.name || 'Rider',
-              riderPhone: rider?.phone || 'Not available'
+              vehicleType,
+              customerName: booking.rider.fullName,
+              customerPhone: booking.rider.phone,
+              customerRating: booking.rider.rating
             });
           }
         });
@@ -157,42 +172,63 @@ export function setupSocketServer(server) {
       try {
         const { bookingId, driverId } = data;
         
+        // Get driver details
+        const driver = await prisma.driver.findUnique({
+          where: { id: driverId }
+        });
+
+        if (!driver) {
+          throw new Error('Driver not found');
+        }
+
         // Update booking with driver
-        const booking = await prisma.booking.update({
-          where: { id: parseInt(bookingId) },
+        const booking = await prisma.rideBooking.update({
+          where: { id: bookingId },
           data: {
-            driverId: parseInt(driverId),
-            status: 'accepted'
+            driverId: driverId,
+            driverName: driver.fullName,
+            status: 'ACCEPTED',
+            acceptedAt: new Date()
           },
           include: {
-            rider: true,
-            driver: true
+            rider: {
+              select: {
+                id: true,
+                fullName: true,
+                phone: true,
+                email: true
+              }
+            }
           }
         });
 
         // Update driver availability
         await prisma.driver.update({
-          where: { id: parseInt(driverId) },
+          where: { id: driverId },
           data: { isAvailable: false }
         });
 
         // Notify rider
-        const riderSocketId = activeConnections.get(booking.riderId.toString());
+        const riderSocketId = activeConnections.get(booking.rider.id);
         if (riderSocketId) {
           io.to(riderSocketId).emit('ride_accepted_by_driver', {
             bookingId: booking.id,
-            driverName: booking.driver.name,
-            driverPhone: booking.driver.phone,
-            driverVehicle: booking.driver.vehicleType,
-            driverRating: booking.driver.rating,
-            driverLat: booking.driver.currentLat,
-            driverLng: booking.driver.currentLng
+            driverName: driver.fullName,
+            driverPhone: driver.phone,
+            driverVehicle: driver.vehicleNumber,
+            driverRating: driver.rating,
+            driverLat: driver.currentLat,
+            driverLng: driver.currentLng
           });
         }
 
         socket.emit('ride_accepted', { 
           success: true, 
-          booking,
+          booking: {
+            ...booking,
+            customerName: booking.rider.fullName,
+            customerPhone: booking.rider.phone
+          },
           message: 'Ride accepted successfully' 
         });
 
@@ -213,7 +249,7 @@ export function setupSocketServer(server) {
         // Update user's current location in database
         if (userType === 'driver') {
           await prisma.driver.update({
-            where: { id: parseInt(userId) },
+            where: { id: userId },
             data: { 
               currentLat: parseFloat(latitude),
               currentLng: parseFloat(longitude)
@@ -221,7 +257,7 @@ export function setupSocketServer(server) {
           });
         } else {
           await prisma.rider.update({
-            where: { id: parseInt(userId) },
+            where: { id: userId },
             data: { 
               currentLat: parseFloat(latitude),
               currentLng: parseFloat(longitude)
@@ -232,24 +268,22 @@ export function setupSocketServer(server) {
         // Find active booking for this user
         let activeBooking;
         if (userType === 'driver') {
-          activeBooking = await prisma.booking.findFirst({
+          activeBooking = await prisma.rideBooking.findFirst({
             where: { 
-              driverId: parseInt(userId),
-              status: { in: ['accepted', 'ongoing'] }
+              driverId: userId,
+              status: { in: ['ACCEPTED', 'ARRIVED', 'STARTED'] }
             },
             include: {
-              rider: true,
-              driver: true
+              rider: true
             }
           });
         } else {
-          activeBooking = await prisma.booking.findFirst({
+          activeBooking = await prisma.rideBooking.findFirst({
             where: { 
-              riderId: parseInt(userId),
-              status: { in: ['accepted', 'ongoing'] }
+              userId: userId,
+              status: { in: ['ACCEPTED', 'ARRIVED', 'STARTED'] }
             },
             include: {
-              rider: true,
               driver: true
             }
           });
@@ -258,8 +292,8 @@ export function setupSocketServer(server) {
         if (activeBooking) {
           // Notify the other party about location update
           const otherUserId = userType === 'driver' 
-            ? activeBooking.riderId.toString()
-            : activeBooking.driverId.toString();
+            ? activeBooking.userId
+            : activeBooking.driverId;
           
           const otherUserSocketId = activeConnections.get(otherUserId);
           
@@ -270,19 +304,12 @@ export function setupSocketServer(server) {
               latitude,
               longitude,
               bookingId: activeBooking.id,
-              distance: userType === 'driver' 
-                ? calculateDistance(
-                    latitude, 
-                    longitude, 
-                    activeBooking.pickupLat, 
-                    activeBooking.pickupLng
-                  )
-                : calculateDistance(
-                    latitude, 
-                    longitude, 
-                    activeBooking.driver.currentLat, 
-                    activeBooking.driver.currentLng
-                  )
+              distance: calculateDistance(
+                latitude, 
+                longitude, 
+                userType === 'driver' ? activeBooking.fromLat : activeBooking.driver?.currentLat,
+                userType === 'driver' ? activeBooking.fromLon : activeBooking.driver?.currentLng
+              )
             });
           }
         }
@@ -304,18 +331,45 @@ export function setupSocketServer(server) {
       try {
         const { bookingId, status } = data;
         
-        const booking = await prisma.booking.update({
-          where: { id: parseInt(bookingId) },
-          data: { status },
+        const updateData = { status };
+        
+        // Add timestamp based on status
+        switch (status) {
+          case 'ARRIVED':
+            updateData.arrivedAt = new Date();
+            break;
+          case 'STARTED':
+            updateData.startedAt = new Date();
+            break;
+          case 'COMPLETED':
+            updateData.completedAt = new Date();
+            break;
+        }
+
+        const booking = await prisma.rideBooking.update({
+          where: { id: bookingId },
+          data: updateData,
           include: {
-            rider: true,
-            driver: true
+            rider: {
+              select: {
+                id: true,
+                fullName: true,
+                phone: true
+              }
+            },
+            driver: {
+              select: {
+                id: true,
+                fullName: true,
+                phone: true
+              }
+            }
           }
         });
 
         // Notify both parties
-        const riderSocketId = activeConnections.get(booking.riderId.toString());
-        const driverSocketId = activeConnections.get(booking.driverId.toString());
+        const riderSocketId = activeConnections.get(booking.userId);
+        const driverSocketId = activeConnections.get(booking.driverId);
 
         if (riderSocketId) {
           io.to(riderSocketId).emit('ride_status_updated', { 
@@ -331,12 +385,24 @@ export function setupSocketServer(server) {
         }
 
         // Handle ride completion
-        if (status === 'completed') {
+        if (status === 'COMPLETED') {
           // Make driver available again
           await prisma.driver.update({
             where: { id: booking.driverId },
             data: { isAvailable: true }
           });
+
+          // Update ride counts
+          await Promise.all([
+            prisma.driver.update({
+              where: { id: booking.driverId },
+              data: { totalRides: { increment: 1 } }
+            }),
+            prisma.rider.update({
+              where: { id: booking.userId },
+              data: { totalRides: { increment: 1 } }
+            })
+          ]);
 
           if (riderSocketId) {
             io.to(riderSocketId).emit('ride_completed', { 
@@ -364,91 +430,6 @@ export function setupSocketServer(server) {
       }
     });
 
-    // Driver cancels ride
-    socket.on('driver_cancel_ride', async (data) => {
-      try {
-        const { bookingId, driverId } = data;
-        
-        const booking = await prisma.booking.update({
-          where: { id: parseInt(bookingId) },
-          data: { 
-            status: 'cancelled',
-            driverId: null
-          },
-          include: {
-            rider: true
-          }
-        });
-
-        // Make driver available again
-        await prisma.driver.update({
-          where: { id: parseInt(driverId) },
-          data: { isAvailable: true }
-        });
-
-        // Notify rider
-        const riderSocketId = activeConnections.get(booking.riderId.toString());
-        if (riderSocketId) {
-          io.to(riderSocketId).emit('ride_cancelled_by_driver', {
-            bookingId,
-            message: 'Driver cancelled the ride'
-          });
-        }
-
-        socket.emit('ride_cancelled_success', { 
-          success: true 
-        });
-
-      } catch (error) {
-        console.error('Error cancelling ride:', error);
-        socket.emit('ride_cancelled_error', { 
-          error: error.message 
-        });
-      }
-    });
-
-    // Rider cancels ride
-    socket.on('rider_cancel_ride', async (data) => {
-      try {
-        const { bookingId, riderId } = data;
-        
-        const booking = await prisma.booking.update({
-          where: { id: parseInt(bookingId) },
-          data: { status: 'cancelled' },
-          include: {
-            driver: true
-          }
-        });
-
-        // If driver was assigned, make them available
-        if (booking.driverId) {
-          await prisma.driver.update({
-            where: { id: booking.driverId },
-            data: { isAvailable: true }
-          });
-
-          // Notify driver
-          const driverSocketId = activeConnections.get(booking.driverId.toString());
-          if (driverSocketId) {
-            io.to(driverSocketId).emit('ride_cancelled_by_rider', {
-              bookingId,
-              message: 'Rider cancelled the ride'
-            });
-          }
-        }
-
-        socket.emit('ride_cancelled_success', { 
-          success: true 
-        });
-
-      } catch (error) {
-        console.error('Error cancelling ride:', error);
-        socket.emit('ride_cancelled_error', { 
-          error: error.message 
-        });
-      }
-    });
-
     // Handle disconnect
     socket.on('disconnect', async () => {
       console.log('User disconnected:', socket.id);
@@ -460,7 +441,7 @@ export function setupSocketServer(server) {
         try {
           if (socket.userType === 'driver') {
             await prisma.driver.update({
-              where: { id: parseInt(socket.userId) },
+              where: { id: socket.userId },
               data: { 
                 isOnline: false,
                 isAvailable: false 
@@ -468,7 +449,7 @@ export function setupSocketServer(server) {
             });
           } else {
             await prisma.rider.update({
-              where: { id: parseInt(socket.userId) },
+              where: { id: socket.userId },
               data: { isOnline: false }
             });
           }

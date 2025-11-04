@@ -1,4 +1,4 @@
-// schema.prisma
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -26,12 +26,14 @@ model Driver {
   toCity        String?
   status        DriverStatus @default(PENDING)
   isOnline      Boolean      @default(false)
+  isAvailable   Boolean      @default(true)
+  currentLat    Float?
+  currentLng    Float?
   rating        Float?       @default(4.5)
   totalRides    Int          @default(0)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  // Relations
   notifications DriverNotification[]
   assignedRides RideBooking[]
 
@@ -48,6 +50,7 @@ enum JourneyType {
 enum DriverStatus {
   PENDING
   ACTIVE
+  BLOCKED
 }
 
 model Rider {
@@ -58,6 +61,9 @@ model Rider {
   profilePhotoUrl String?
   marketingOptIn  Boolean  @default(false)
   acceptTerms     Boolean  @default(false)
+  isOnline        Boolean  @default(false)
+  currentLat      Float?
+  currentLng      Float?
   rating          Float?   @default(5.0)
   totalRides      Int      @default(0)
   createdAt       DateTime @default(now())
@@ -76,8 +82,8 @@ model RiderAddress {
   type      AddressType
   fullText  String
   landmark  String?
-  lat       String?
-  lon       String?
+  lat       Float?
+  lon       Float?
   createdAt DateTime    @default(now())
 
   rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
@@ -120,39 +126,34 @@ model RideBooking {
   vehicleType  String
   fromLocation String
   toLocation   String
-  fromLat      String?
-  fromLon      String?
-  toLat        String?
-  toLon        String?
+  fromLat      Float?
+  fromLon      Float?
+  toLat        Float?
+  toLon        Float?
   price        Float
   distance     Float
   status       RideStatus @default(PENDING)
-
-  // Customer info
-  customerName   String?
-  customerPhone  String?
-  customerRating Float?  @default(4.5)
 
   // Driver assignment
   driverId   String?
   driverName String?
 
   // Rider relation
-  userId String?
+  userId String
 
   // Timestamps
-  created_at  DateTime  @default(now())
+  createdAt   DateTime @default(now())
   acceptedAt  DateTime?
-  declinedAt  DateTime?
+  arrivedAt   DateTime?
   startedAt   DateTime?
   completedAt DateTime?
   cancelledAt DateTime?
-  updated_at  DateTime  @updatedAt
+  updatedAt   DateTime @updatedAt
 
   // Relations
   notifications DriverNotification[]
-  rider         Rider?               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  driver        Driver?              @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  rider         Rider    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driver        Driver?  @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
   @@map("ride_bookings")
 }
@@ -160,6 +161,9 @@ model RideBooking {
 enum RideStatus {
   PENDING
   ACCEPTED
+  ARRIVED
+  STARTED
+  COMPLETED
   DECLINED
   CANCELLED
 }
@@ -173,8 +177,8 @@ model VehicleType {
   seats      Int
   color      String
   isActive   Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@map("vehicle_types")
 }
@@ -184,12 +188,11 @@ model DriverNotification {
   driverId      String
   rideBookingId String
   type          NotificationType @default(RIDE_REQUEST)
-  status        String // accepted, declined, etc.
+  status        String
   message       String           @db.VarChar(500)
   isRead        Boolean          @default(false)
   createdAt     DateTime         @default(now())
 
-  // Relations
   driver      Driver      @relation(fields: [driverId], references: [id], onDelete: Cascade)
   rideBooking RideBooking @relation(fields: [rideBookingId], references: [id], onDelete: Cascade)
 

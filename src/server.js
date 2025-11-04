@@ -1,4 +1,5 @@
-// server.js (Fixed)
+// server.js
+
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -18,7 +19,7 @@ const app = express();
 const server = createServer(app);
 const prisma = new PrismaClient();
 
-// ✅ CORS setup
+// CORS setup
 const corsOptions = {
   origin: [
     process.env.CORS_ORIGIN,
@@ -35,10 +36,10 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// ✅ Setup Socket.io server
+// Setup Socket.io server
 setupSocketServer(server);
 
-// ✅ Health check route
+// Health check route
 app.get("/health", async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -56,7 +57,7 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// ✅ Socket.io health check
+// Socket.io health check
 app.get("/socket-health", (req, res) => {
   res.json({
     ok: true,
@@ -65,7 +66,7 @@ app.get("/socket-health", (req, res) => {
   });
 });
 
-// ✅ Register routes
+// Register routes
 app.use("/api/driver", driverRoutes);
 app.use("/api/rider", riderRoutes);
 app.use("/api/destination-search", destinationSearchRoutes);
@@ -73,7 +74,7 @@ app.use("/api/driver-notifications", driverNotificationRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/socket", socketRoutes);
 
-// ✅ Global error handler
+// Global error handler
 app.use((err, req, res, next) => {
   console.error('Global error handler:', err);
   res.status(500).json({
@@ -84,7 +85,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ✅ FIXED: 404 handler - Remove the wildcard issue
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -94,11 +95,11 @@ app.use((req, res) => {
   });
 });
 
-// ✅ Start server
+// Start server
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ HTTP Server running on http://10.184.209.195:${PORT}`);
-  console.log(`✅ Socket Server running on ws://10.184.209.195:${PORT}`);
+  console.log(`✅ HTTP Server running on port: ${PORT}`);
+  console.log(`✅ Socket Server running on port: ${PORT}`);
   console.log(`📍 Local access: http://localhost:${PORT}`);
   console.log(`🔌 Socket endpoint: ws://localhost:${PORT}`);
 });
