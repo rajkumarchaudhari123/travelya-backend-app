@@ -637,33 +637,6 @@ const initializeVehicleTypes = async (req, res) => {
     }
 };
 
-// Create a test rider for development
-const createTestRider = async (req, res) => {
-    try {
-        const rider = await prisma.rider.create({
-            data: {
-                fullName: 'Test Rider',
-                phone: '+911234567890',
-                email: 'test@example.com',
-                acceptTerms: true
-            }
-        });
-
-        res.json({
-            success: true,
-            message: 'Test rider created successfully',
-            data: rider
-        });
-    } catch (error) {
-        console.error('❌ Create test rider error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create test rider',
-            error: error.message
-        });
-    }
-};
-
 // Health check for LocationIQ API
 const checkLocationIQHealth = async (req, res) => {
     try {
@@ -703,6 +676,5 @@ export {
     updateBookingStatus,
     cancelBooking,
     initializeVehicleTypes,
-    createTestRider,
     checkLocationIQHealth
 };
