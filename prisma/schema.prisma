@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Driver {
@@ -134,6 +134,12 @@ model RideBooking {
   distance     Float
   status       RideStatus @default(PENDING)
 
+  otpCode       String? // 4-digit OTP code
+  otpExpiresAt  DateTime? // OTP expiration time
+  otpVerified   Boolean   @default(false)
+  otpVerifiedAt DateTime?
+  otpAttempts   Int       @default(0)
+
   // Driver assignment
   driverId   String?
   driverName String?
@@ -142,18 +148,18 @@ model RideBooking {
   userId String
 
   // Timestamps
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   acceptedAt  DateTime?
   arrivedAt   DateTime?
   startedAt   DateTime?
   completedAt DateTime?
   cancelledAt DateTime?
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime  @updatedAt
 
   // Relations
   notifications DriverNotification[]
-  rider         Rider    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  driver        Driver?  @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  rider         Rider                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driver        Driver?              @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
   @@map("ride_bookings")
 }
@@ -163,6 +169,7 @@ enum RideStatus {
   ACCEPTED
   ARRIVED
   STARTED
+  OTP_VERIFIED
   COMPLETED
   DECLINED
   CANCELLED
@@ -189,7 +196,7 @@ model DriverNotification {
   rideBookingId String
   type          NotificationType @default(RIDE_REQUEST)
   status        String
-  message       String           
+  message       String
   isRead        Boolean          @default(false)
   createdAt     DateTime         @default(now())
 

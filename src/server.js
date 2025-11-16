@@ -12,6 +12,7 @@ import driverNotificationRoutes from "./routes/driverNotificationRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import socketRoutes from "./routes/socketRoutes.js";
 import { setupSocketServer } from "./socketServer.js";
+import otpRoutes from "./routes/otpRoutes.js";
 
 dotenv.config();
 
@@ -73,6 +74,7 @@ app.use("/api/destination-search", destinationSearchRoutes);
 app.use("/api/driver-notifications", driverNotificationRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/socket", socketRoutes);
+app.use("/api/otp", otpRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
