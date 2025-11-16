@@ -134,8 +134,8 @@ model RideBooking {
   distance     Float
   status       RideStatus @default(PENDING)
 
-  otpCode       String? // 4-digit OTP code
-  otpExpiresAt  DateTime? // OTP expiration time
+  otpCode       String?   @db.VarChar(10)
+  otpExpiresAt  DateTime?
   otpVerified   Boolean   @default(false)
   otpVerifiedAt DateTime?
   otpAttempts   Int       @default(0)
