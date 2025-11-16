@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,68 +8,53 @@ datasource db {
 }
 
 model Driver {
-  id            String       @id @default(cuid())
+  id            String               @id @default(cuid())
   fullName      String
-  phone         String       @unique
-  email         String?      @unique
+  phone         String               @unique
+  email         String?              @unique
   vehicleNumber String
-  licenseNumber String       @unique
+  licenseNumber String               @unique
   idFront       String?
   idBack        String?
   licenseDoc    String?
   rcDoc         String?
   selfie        String?
-  journeyType   JourneyType  @default(UNKNOWN)
+  journeyType   JourneyType          @default(UNKNOWN)
   fromCity      String?
   toCity        String?
-  status        DriverStatus @default(PENDING)
-  isOnline      Boolean      @default(false)
-  isAvailable   Boolean      @default(true)
+  status        DriverStatus         @default(PENDING)
+  isOnline      Boolean              @default(false)
+  isAvailable   Boolean              @default(true)
   currentLat    Float?
   currentLng    Float?
-  rating        Float?       @default(4.5)
-  totalRides    Int          @default(0)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-
+  rating        Float?               @default(4.5)
+  totalRides    Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
   notifications DriverNotification[]
   assignedRides RideBooking[]
 
   @@map("drivers")
 }
 
-enum JourneyType {
-  INTERCITY
-  LOCAL
-  BOTH
-  UNKNOWN
-}
-
-enum DriverStatus {
-  PENDING
-  ACTIVE
-  BLOCKED
-}
-
 model Rider {
-  id              String   @id @default(uuid())
+  id              String           @id @default(uuid())
   fullName        String
-  phone           String   @unique
-  email           String?  @unique
+  phone           String           @unique
+  email           String?          @unique
   profilePhotoUrl String?
-  marketingOptIn  Boolean  @default(false)
-  acceptTerms     Boolean  @default(false)
-  isOnline        Boolean  @default(false)
+  marketingOptIn  Boolean          @default(false)
+  acceptTerms     Boolean          @default(false)
+  isOnline        Boolean          @default(false)
   currentLat      Float?
   currentLng      Float?
-  rating          Float?   @default(5.0)
-  totalRides      Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  addresses   RiderAddress[]
-  preferences RiderPreference?
-  bookings    RideBooking[]
+  rating          Float?           @default(5.0)
+  totalRides      Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  bookings        RideBooking[]
+  addresses       RiderAddress[]
+  preferences     RiderPreference?
 
   @@map("riders")
 }
@@ -85,8 +68,7 @@ model RiderAddress {
   lat       Float?
   lon       Float?
   createdAt DateTime    @default(now())
-
-  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  rider     Rider       @relation(fields: [riderId], references: [id], onDelete: Cascade)
 
   @@map("rider_addresses")
 }
@@ -97,16 +79,9 @@ model RiderPreference {
   language           String? @default("en")
   accessibilityNeeds String?
   preferredVehicle   String?
-
-  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  rider              Rider   @relation(fields: [riderId], references: [id], onDelete: Cascade)
 
   @@map("rider_preferences")
-}
-
-enum AddressType {
-  HOME
-  WORK
-  OTHER
 }
 
 model Location {
@@ -122,57 +97,37 @@ model Location {
 }
 
 model RideBooking {
-  id           String     @id @default(cuid())
-  vehicleType  String
-  fromLocation String
-  toLocation   String
-  fromLat      Float?
-  fromLon      Float?
-  toLat        Float?
-  toLon        Float?
-  price        Float
-  distance     Float
-  status       RideStatus @default(PENDING)
-
-  otpCode       String?   @db.VarChar(10)
+  id            String               @id @default(cuid())
+  vehicleType   String
+  fromLocation  String
+  toLocation    String
+  fromLat       Float?
+  fromLon       Float?
+  toLat         Float?
+  toLon         Float?
+  price         Float
+  distance      Float
+  status        RideStatus           @default(PENDING)
+  driverId      String?
+  driverName    String?
+  userId        String
+  createdAt     DateTime             @default(now())
+  acceptedAt    DateTime?
+  arrivedAt     DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  cancelledAt   DateTime?
+  updatedAt     DateTime             @updatedAt
+  otpAttempts   Int                  @default(0)
+  otpCode       String?              @db.VarChar(10)
   otpExpiresAt  DateTime?
-  otpVerified   Boolean   @default(false)
+  otpVerified   Boolean              @default(false)
   otpVerifiedAt DateTime?
-  otpAttempts   Int       @default(0)
-
-  // Driver assignment
-  driverId   String?
-  driverName String?
-
-  // Rider relation
-  userId String
-
-  // Timestamps
-  createdAt   DateTime  @default(now())
-  acceptedAt  DateTime?
-  arrivedAt   DateTime?
-  startedAt   DateTime?
-  completedAt DateTime?
-  cancelledAt DateTime?
-  updatedAt   DateTime  @updatedAt
-
-  // Relations
   notifications DriverNotification[]
+  driver        Driver?              @relation(fields: [driverId], references: [id])
   rider         Rider                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  driver        Driver?              @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
   @@map("ride_bookings")
-}
-
-enum RideStatus {
-  PENDING
-  ACCEPTED
-  ARRIVED
-  STARTED
-  OTP_VERIFIED
-  COMPLETED
-  DECLINED
-  CANCELLED
 }
 
 model VehicleType {
@@ -199,11 +154,40 @@ model DriverNotification {
   message       String
   isRead        Boolean          @default(false)
   createdAt     DateTime         @default(now())
-
-  driver      Driver      @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  rideBooking RideBooking @relation(fields: [rideBookingId], references: [id], onDelete: Cascade)
+  driver        Driver           @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  rideBooking   RideBooking      @relation(fields: [rideBookingId], references: [id], onDelete: Cascade)
 
   @@map("driver_notifications")
+}
+
+enum JourneyType {
+  INTERCITY
+  LOCAL
+  BOTH
+  UNKNOWN
+}
+
+enum DriverStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+}
+
+enum AddressType {
+  HOME
+  WORK
+  OTHER
+}
+
+enum RideStatus {
+  PENDING
+  ACCEPTED
+  ARRIVED
+  STARTED
+  COMPLETED
+  DECLINED
+  CANCELLED
+  OTP_VERIFIED
 }
 
 enum NotificationType {
